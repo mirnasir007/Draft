@@ -253,6 +253,7 @@
                             <span class="helper-link text-secondary" onclick="selectByStatus('draft')">Draft</span>
                             <span class="helper-link text-warning fw-bold" onclick="selectByStatus('draft_stock')">Has Stock</span>
                             <span class="helper-link text-danger" onclick="selectByStatus('none')">None</span>
+                            <span id="selectFeedback" class="ms-2 fw-bold" style="opacity: 0; transition: opacity 0.5s;"></span>
                         </div>
                         <div class="mt-0 text-muted small ms-2">Total: <span id="productCount" class="text-dark fw-bold">0</span></div>
                     </div>
@@ -488,19 +489,55 @@
             }).join('');
         }
 
+        let feedbackTimeout;
         function selectByStatus(type) {
+            let currentSelected = document.querySelectorAll('.product-check:checked').length;
+            let matchCount = 0;
+
             document.querySelectorAll('.product-check').forEach(cb => {
                 const p = globalProducts.find(item => item.id == cb.value);
                 if(!p) return;
+                
                 const isDraft = p.status === 'draft';
                 const isActive = p.status === 'active';
                 const hasStock = p.variants && p.variants.some(v => parseInt(v.inventory_quantity) > 0);
+                
                 cb.checked = false;
+                
                 if (type === 'all') cb.checked = true;
                 else if (type === 'active' && isActive) cb.checked = true;
                 else if (type === 'draft' && isDraft) cb.checked = true;
                 else if (type === 'draft_stock' && isDraft && hasStock) cb.checked = true;
+
+                if (cb.checked) matchCount++;
             });
+
+            // Professional non-blocking feedback
+            const feedbackEl = document.getElementById('selectFeedback');
+            clearTimeout(feedbackTimeout);
+            
+            if (type === 'none') {
+                if (currentSelected > 0) {
+                    feedbackEl.innerHTML = "✅ Unselected All";
+                    feedbackEl.className = "ms-2 text-danger fw-bold";
+                } else {
+                    feedbackEl.innerHTML = "⚠️ Please select first";
+                    feedbackEl.className = "ms-2 text-warning fw-bold";
+                }
+            } else {
+                if (matchCount > 0) {
+                    feedbackEl.innerHTML = `✅ Selected ${matchCount}`;
+                    feedbackEl.className = "ms-2 text-success fw-bold";
+                } else {
+                    feedbackEl.innerHTML = "⚠️ Found 0";
+                    feedbackEl.className = "ms-2 text-secondary fw-bold";
+                }
+            }
+            
+            feedbackEl.style.opacity = 1;
+            feedbackTimeout = setTimeout(() => {
+                feedbackEl.style.opacity = 0;
+            }, 3000); // Fades out automatically after 3 seconds
         }
 
         function trackInv(el, iid) {
