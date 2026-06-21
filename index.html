@@ -239,6 +239,7 @@
                         <div class="col-6 col-md-5 d-flex gap-1 justify-content-end align-items-end">
                             <button class="btn btn-sm btn-success flex-fill" onclick="initUpdateStatus('active')">Active</button>
                             <button class="btn btn-sm btn-secondary flex-fill" onclick="initUpdateStatus('draft')">Draft</button>
+                            <button class="btn btn-sm btn-warning flex-fill text-dark fw-bold" onclick="initZeroInventory()">0 Inv</button>
                             <button class="btn btn-sm btn-outline-primary" onclick="loadProducts()">↻</button>
                         </div>
                     </div>
@@ -515,6 +516,126 @@
             let msg = `Set ${count} to ${status.toUpperCase()}?`;
             if (status === 'draft') msg += "\n\n⚠️ Inv will be 0!";
             showConfirm(msg, () => updateStatus(status));
+        }
+
+        function initZeroInventory() {
+            const count = document.querySelectorAll('.product-check:checked').length;
+            if(count === 0) return showCustomAlert("Select products first.");
+
+            showConfirm(`Set inventory to 0 for ${count} selected products across ALL locations?`, () => processZeroInventory());
+        }
+
+        async function processZeroInventory() {
+            const ids = Array.from(document.querySelectorAll('.product-check:checked')).map(cb => cb.value);
+            showLoader(true);
+            
+            const progressText = document.getElementById('progressText');
+            progressText.style.display = 'inline-block';
+            progressText.innerText = `0/${ids.length}`;
+
+            let successCount = 0;
+
+            for (let i = 0; i < ids.length; i++) {
+                const id = ids[i];
+                const res = await callAPI('zeroInventoryBatch', { ids: [id] });
+                
+                if (res.success) {
+                    successCount++;
+                    globalProducts.forEach(p => { 
+                        if(p.id == id && p.variants) {
+                            p.variants.forEach(v => v.inventory_quantity = 0);
+                        }
+                    });
+                }
+                
+                progressText.innerText = `${i + 1}/${ids.length}`;
+            }
+
+            progressText.style.display = 'none';
+            showCustomAlert(`Successfully zeroed inventory for ${successCount} out of ${ids.length} products!`);
+            
+            applySort();
+            showLoader(false);
+        }
+
+        function initZeroInventory() {
+            const count = document.querySelectorAll('.product-check:checked').length;
+            if(count === 0) return showCustomAlert("Select products first.");
+
+            showConfirm(`Set inventory to 0 for ${count} selected products across ALL locations?`, () => processZeroInventory());
+        }
+
+        async function processZeroInventory() {
+            const ids = Array.from(document.querySelectorAll('.product-check:checked')).map(cb => cb.value);
+            showLoader(true);
+            
+            const progressText = document.getElementById('progressText');
+            progressText.style.display = 'inline-block';
+            progressText.innerText = `0/${ids.length}`;
+
+            let successCount = 0;
+
+            for (let i = 0; i < ids.length; i++) {
+                const id = ids[i];
+                const res = await callAPI('zeroInventoryBatch', { ids: [id] });
+                
+                if (res.success) {
+                    successCount++;
+                    globalProducts.forEach(p => { 
+                        if(p.id == id && p.variants) {
+                            p.variants.forEach(v => v.inventory_quantity = 0);
+                        }
+                    });
+                }
+                
+                progressText.innerText = `${i + 1}/${ids.length}`;
+            }
+
+            progressText.style.display = 'none';
+            showCustomAlert(`Successfully zeroed inventory for ${successCount} out of ${ids.length} products!`);
+            
+            applySort();
+            showLoader(false);
+        }
+
+        function initZeroInventory() {
+            const count = document.querySelectorAll('.product-check:checked').length;
+            if(count === 0) return showCustomAlert("Select products first.");
+
+            showConfirm(`Set inventory to 0 for ${count} selected products across ALL locations?`, () => processZeroInventory());
+        }
+
+        async function processZeroInventory() {
+            const ids = Array.from(document.querySelectorAll('.product-check:checked')).map(cb => cb.value);
+            showLoader(true);
+            
+            const progressText = document.getElementById('progressText');
+            progressText.style.display = 'inline-block';
+            progressText.innerText = `0/${ids.length}`;
+
+            let successCount = 0;
+
+            for (let i = 0; i < ids.length; i++) {
+                const id = ids[i];
+                const res = await callAPI('zeroInventoryBatch', { ids: [id] });
+                
+                if (res.success) {
+                    successCount++;
+                    globalProducts.forEach(p => { 
+                        if(p.id == id && p.variants) {
+                            p.variants.forEach(v => v.inventory_quantity = 0);
+                        }
+                    });
+                }
+                
+                progressText.innerText = `${i + 1}/${ids.length}`;
+            }
+
+            progressText.style.display = 'none';
+            showCustomAlert(`Successfully zeroed inventory for ${successCount} out of ${ids.length} products!`);
+            
+            applySort();
+            showLoader(false);
         }
 
         function initDraftAllStore() {
