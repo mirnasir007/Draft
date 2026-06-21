@@ -200,6 +200,7 @@
             <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-white shadow-sm rounded">
                 <h5 class="m-0 fw-bold">Shopify Manager</h5>
                 <div class="d-flex align-items-center gap-1">
+                    <span id="progressText" class="badge bg-primary fs-6 shadow-sm me-1" style="display:none;">0/0</span>
                     <button id="btnSaveInventory" class="btn btn-warning btn-sm fw-bold shadow-sm" style="display:none;" onclick="saveInventoryChanges()">💾 Save</button>
                     <button class="btn btn-danger btn-sm fw-bold border border-white shadow-sm" onclick="initDraftAllStore()">⚠️ All Draft</button>
                 </div>
@@ -214,9 +215,13 @@
                                 <input type="text" id="storeSearch" class="form-control" placeholder="Search Title, SKU...">
                                 <button class="btn btn-primary" type="button" onclick="searchStore()">Search</button>
                             </div>
-                            <select id="collectionSelect" class="form-select form-select-sm" onchange="loadProducts()">
-                                <option value="" selected disabled>-- Select Collection --</option>
-                            </select>
+                            
+                            <div style="position: relative;">
+                                <input type="text" id="collectionSearchInput" class="form-control form-control-sm cursor-pointer" placeholder="-- Search & Select Collection --" onfocus="showCollectionDropdown()" oninput="filterCollections()" autocomplete="off">
+                                <div id="collectionDropdownList" class="dropdown-menu w-100 shadow-sm" style="display: none; position: absolute; max-height: 250px; overflow-y: auto; z-index: 1050; padding: 5px; background: white; border: 1px solid #ddd;">
+                                    </div>
+                                <input type="hidden" id="collectionSelect" value="">
+                            </div>
                         </div>
                         
                         <!-- Sort -->
@@ -279,8 +284,7 @@
     </div>
 
     <script>
-        // UPDATE THIS URL IF YOU RE-DEPLOY
-        const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzyfwn3QM5HTtkWACf7V6eto14AMrQmRG2zznKaEXyBNmCodqpuQuagVjhv2BweRhkMeg/exec"; 
+        const API_URL = "https://draft-backend-t78r.onrender.com/api"; 
         
         let globalProducts = [];
         let pendingInventory = {};
@@ -306,15 +310,58 @@
             showLoader(false);
         }
 
+        let globalCollections = [];
+
         async function fetchCollections() {
             const res = await callAPI('getCollections');
             if (res.success) {
-                const sel = document.getElementById('collectionSelect');
-                res.collections.forEach(c => {
-                    const opt = document.createElement('option'); opt.value = c.id; opt.text = c.title; sel.appendChild(opt);
-                });
+                globalCollections = res.collections;
+                renderCollectionDropdown(globalCollections);
             }
         }
+
+        function renderCollectionDropdown(collections) {
+            const list = document.getElementById('collectionDropdownList');
+            if (!collections || collections.length === 0) {
+                list.innerHTML = '<div class="text-muted small p-2 text-center">No collections found.</div>';
+                return;
+            }
+            list.innerHTML = collections.map(c => 
+                `<a class="dropdown-item small text-truncate" style="cursor: pointer; padding: 6px 10px; display: block; text-decoration: none; color: #333;" 
+                    onclick="selectCollection('${c.id}', '${c.title.replace(/'/g, "\\'")}')" 
+                    onmouseover="this.style.background='#f8f9fa'" 
+                    onmouseout="this.style.background='transparent'">${c.title}</a>`
+            ).join('');
+        }
+
+        function showCollectionDropdown() {
+            document.getElementById('collectionDropdownList').style.display = 'block';
+            filterCollections();
+        }
+
+        function filterCollections() {
+            const q = document.getElementById('collectionSearchInput').value.toLowerCase();
+            const filtered = globalCollections.filter(c => c.title.toLowerCase().includes(q));
+            renderCollectionDropdown(filtered);
+        }
+
+        function selectCollection(id, title) {
+            document.getElementById('collectionSelect').value = id;
+            document.getElementById('collectionSearchInput').value = title;
+            document.getElementById('collectionDropdownList').style.display = 'none';
+            loadProducts();
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            const searchInput = document.getElementById('collectionSearchInput');
+            const dropdown = document.getElementById('collectionDropdownList');
+            if (searchInput && dropdown) {
+                if (!searchInput.contains(event.target) && !dropdown.contains(event.target)) {
+                    dropdown.style.display = 'none';
+                }
+            }
+        });
 
         async function loadProducts() {
             const cid = document.getElementById('collectionSelect').value;
@@ -328,20 +375,47 @@
             showLoader(false);
         }
 
-        async function updateStatus(newStatus) {
-            const ids = Array.from(document.querySelectorAll('.product-check:checked')).map(cb => cb.value);
+        async function updateStatus(newStatus, predefinedIds = null) {
+            const ids = predefinedIds || Array.from(document.querySelectorAll('.product-check:checked')).map(cb => cb.value);
+            if (!ids || ids.length === 0) return showCustomAlert("Select products first.");
+
             showLoader(true);
-            const res = await callAPI('updateStatus', { ids: ids, status: newStatus });
-            if (res.success) {
-                showCustomAlert("Updated!");
-                if(newStatus === 'draft') {
-                     const q = document.getElementById('storeSearch').value;
-                     if(q) searchStore(); else loadProducts();
-                } else {
-                     globalProducts.forEach(p => { if(ids.includes(p.id)) p.status = newStatus; });
-                     applySort();
+            
+            // Show real-time counter UI
+            const progressText = document.getElementById('progressText');
+            progressText.style.display = 'inline-block';
+            progressText.innerText = `0/${ids.length}`;
+
+            let successCount = 0;
+
+            // Process one by one for safety and real-time tracking
+            for (let i = 0; i < ids.length; i++) {
+                const id = ids[i];
+                const res = await callAPI('updateStatus', { ids: [id], status: newStatus });
+                
+                if (res.success) {
+                    successCount++;
+                    // Update frontend data instantly
+                    globalProducts.forEach(p => { 
+                        if(p.id == id) {
+                            p.status = newStatus; 
+                            // Instantly set inventory to 0 in UI if drafted
+                            if(newStatus === 'draft' && p.variants) {
+                                p.variants.forEach(v => v.inventory_quantity = 0);
+                            }
+                        }
+                    });
                 }
+                
+                // Update counter text
+                progressText.innerText = `${i + 1}/${ids.length}`;
             }
+
+            progressText.style.display = 'none';
+            showCustomAlert(`Successfully updated ${successCount} out of ${ids.length} products!`);
+            
+            // Re-render UI instantly without reloading from API
+            applySort();
             showLoader(false);
         }
 
@@ -446,9 +520,19 @@
         function initDraftAllStore() {
             showConfirm("⚠️ DANGER: Set ALL ACTIVE products to DRAFT & INV 0?", async () => {
                 showLoader(true);
-                await callAPI('draftAllStore');
-                showCustomAlert("Done.");
-                showLoader(false);
+                document.getElementById('progressText').style.display = 'inline-block';
+                document.getElementById('progressText').innerText = "Fetching...";
+                
+                // 1. Fetch all active IDs first
+                const res = await callAPI('getActiveIds');
+                if (res.success && res.ids.length > 0) {
+                    // 2. Pass them to the real-time updater
+                    await updateStatus('draft', res.ids);
+                } else {
+                    document.getElementById('progressText').style.display = 'none';
+                    showCustomAlert("No active products found.");
+                    showLoader(false);
+                }
             });
         }
 
@@ -464,9 +548,10 @@
         
         async function callAPI(action, payload={}) {
             try {
-                const res = await fetch(GAS_WEB_APP_URL, {
-                    method: "POST", body: JSON.stringify({ action, ...payload }),
-                    headers: { "Content-Type": "text/plain" }
+                const res = await fetch(API_URL, {
+                    method: "POST", 
+                    body: JSON.stringify({ action, ...payload }),
+                    headers: { "Content-Type": "application/json" }
                 });
                 return await res.json();
             } catch(e) { 
