@@ -194,6 +194,41 @@
         </div>
     </div>
 
+    <!-- Location Selection Modal -->
+    <div id="locationModal" style="display: none; position: fixed; z-index: 3000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); backdrop-filter: blur(2px); justify-content: center; align-items: center;">
+        <div class="confirm-box">
+            <h4 class="mb-3 fw-bold text-dark">Select Location</h4>
+            <p class="text-secondary mb-3 fs-6 text-center">Select multiple locations to set inventory to 0</p>
+            <div class="text-start mb-3" style="max-height: 250px; overflow-y: auto;">
+                <div class="form-check mb-2">
+                    <input class="form-check-input loc-checkbox" type="checkbox" value="all" id="locAll" onclick="toggleAllLocations(this)">
+                    <label class="form-check-label fw-bold text-danger" for="locAll" style="cursor: pointer;">All Locations</label>
+                </div>
+                <hr class="my-2">
+                <div class="form-check mb-2">
+                    <input class="form-check-input loc-checkbox specific-loc" type="checkbox" value="69861605557" id="locMain">
+                    <label class="form-check-label" for="locMain" style="cursor: pointer;">Main Location</label>
+                </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input loc-checkbox specific-loc" type="checkbox" value="115051397301" id="locBanani">
+                    <label class="form-check-label" for="locBanani" style="cursor: pointer;">Banani</label>
+                </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input loc-checkbox specific-loc" type="checkbox" value="115051364533" id="locDhanmondi">
+                    <label class="form-check-label" for="locDhanmondi" style="cursor: pointer;">Dhanmondi</label>
+                </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input loc-checkbox specific-loc" type="checkbox" value="115051430069" id="locUttara">
+                    <label class="form-check-label" for="locUttara" style="cursor: pointer;">Uttara</label>
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-light border px-3 w-50" onclick="document.getElementById('locationModal').style.display='none'">Cancel</button>
+                <button class="btn btn-danger px-3 w-50 fw-bold" onclick="submitZeroInventory()">Confirm</button>
+            </div>
+        </div>
+    </div>
+
     <div class="container-fluid">
         <!-- Sticky Header -->
         <div class="sticky-header-wrapper">
@@ -559,10 +594,39 @@
             const count = document.querySelectorAll('.product-check:checked').length;
             if(count === 0) return showCustomAlert("Select products first.");
 
-            showConfirm(`Set inventory to 0 for ${count} selected products across ALL locations?`, () => processZeroInventory());
+            document.getElementById('locationModal').style.display = 'flex';
         }
 
-        async function processZeroInventory() {
+        function toggleAllLocations(source) {
+            document.querySelectorAll('.specific-loc').forEach(cb => {
+                cb.checked = source.checked;
+            });
+        }
+
+        function submitZeroInventory() {
+            let selectedLocs = [];
+            if (document.getElementById('locAll').checked) {
+                selectedLocs = ['all'];
+            } else {
+                document.querySelectorAll('.specific-loc:checked').forEach(cb => {
+                    selectedLocs.push(cb.value);
+                });
+            }
+
+            if (selectedLocs.length === 0) {
+                return showCustomAlert("Please select at least one location.");
+            }
+
+            processZeroInventory(selectedLocs);
+        }
+
+        async function processZeroInventory(locationIds) {
+            document.getElementById('locationModal').style.display = 'none';
+            
+            // Clear checkboxes for next time
+            document.getElementById('locAll').checked = false;
+            document.querySelectorAll('.specific-loc').forEach(cb => cb.checked = false);
+
             const ids = Array.from(document.querySelectorAll('.product-check:checked')).map(cb => cb.value);
             showLoader(true);
             
@@ -571,18 +635,21 @@
             progressText.innerText = `0/${ids.length}`;
 
             let successCount = 0;
+            const isAll = locationIds.includes('all');
 
             for (let i = 0; i < ids.length; i++) {
                 const id = ids[i];
-                const res = await callAPI('zeroInventoryBatch', { ids: [id] });
+                const res = await callAPI('zeroInventoryBatch', { ids: [id], locationIds: locationIds });
                 
                 if (res.success) {
                     successCount++;
-                    globalProducts.forEach(p => { 
-                        if(p.id == id && p.variants) {
-                            p.variants.forEach(v => v.inventory_quantity = 0);
-                        }
-                    });
+                    if (isAll) {
+                        globalProducts.forEach(p => { 
+                            if(p.id == id && p.variants) {
+                                p.variants.forEach(v => v.inventory_quantity = 0);
+                            }
+                        });
+                    }
                 }
                 
                 progressText.innerText = `${i + 1}/${ids.length}`;
@@ -591,87 +658,9 @@
             progressText.style.display = 'none';
             showCustomAlert(`Successfully zeroed inventory for ${successCount} out of ${ids.length} products!`);
             
-            applySort();
-            showLoader(false);
-        }
-
-        function initZeroInventory() {
-            const count = document.querySelectorAll('.product-check:checked').length;
-            if(count === 0) return showCustomAlert("Select products first.");
-
-            showConfirm(`Set inventory to 0 for ${count} selected products across ALL locations?`, () => processZeroInventory());
-        }
-
-        async function processZeroInventory() {
-            const ids = Array.from(document.querySelectorAll('.product-check:checked')).map(cb => cb.value);
-            showLoader(true);
-            
-            const progressText = document.getElementById('progressText');
-            progressText.style.display = 'inline-block';
-            progressText.innerText = `0/${ids.length}`;
-
-            let successCount = 0;
-
-            for (let i = 0; i < ids.length; i++) {
-                const id = ids[i];
-                const res = await callAPI('zeroInventoryBatch', { ids: [id] });
-                
-                if (res.success) {
-                    successCount++;
-                    globalProducts.forEach(p => { 
-                        if(p.id == id && p.variants) {
-                            p.variants.forEach(v => v.inventory_quantity = 0);
-                        }
-                    });
-                }
-                
-                progressText.innerText = `${i + 1}/${ids.length}`;
+            if (isAll) {
+                applySort();
             }
-
-            progressText.style.display = 'none';
-            showCustomAlert(`Successfully zeroed inventory for ${successCount} out of ${ids.length} products!`);
-            
-            applySort();
-            showLoader(false);
-        }
-
-        function initZeroInventory() {
-            const count = document.querySelectorAll('.product-check:checked').length;
-            if(count === 0) return showCustomAlert("Select products first.");
-
-            showConfirm(`Set inventory to 0 for ${count} selected products across ALL locations?`, () => processZeroInventory());
-        }
-
-        async function processZeroInventory() {
-            const ids = Array.from(document.querySelectorAll('.product-check:checked')).map(cb => cb.value);
-            showLoader(true);
-            
-            const progressText = document.getElementById('progressText');
-            progressText.style.display = 'inline-block';
-            progressText.innerText = `0/${ids.length}`;
-
-            let successCount = 0;
-
-            for (let i = 0; i < ids.length; i++) {
-                const id = ids[i];
-                const res = await callAPI('zeroInventoryBatch', { ids: [id] });
-                
-                if (res.success) {
-                    successCount++;
-                    globalProducts.forEach(p => { 
-                        if(p.id == id && p.variants) {
-                            p.variants.forEach(v => v.inventory_quantity = 0);
-                        }
-                    });
-                }
-                
-                progressText.innerText = `${i + 1}/${ids.length}`;
-            }
-
-            progressText.style.display = 'none';
-            showCustomAlert(`Successfully zeroed inventory for ${successCount} out of ${ids.length} products!`);
-            
-            applySort();
             showLoader(false);
         }
 
