@@ -206,19 +206,19 @@
                 </div>
                 <hr class="my-2">
                 <div class="form-check mb-2">
-                    <input class="form-check-input loc-checkbox specific-loc" type="checkbox" value="69861605557" id="locMain">
+                    <input class="form-check-input loc-checkbox specific-loc" type="checkbox" value="69861605557" id="locMain" onclick="updateAllCheckbox()">
                     <label class="form-check-label" for="locMain" style="cursor: pointer;">Main Location</label>
                 </div>
                 <div class="form-check mb-2">
-                    <input class="form-check-input loc-checkbox specific-loc" type="checkbox" value="115051397301" id="locBanani">
+                    <input class="form-check-input loc-checkbox specific-loc" type="checkbox" value="115051397301" id="locBanani" onclick="updateAllCheckbox()">
                     <label class="form-check-label" for="locBanani" style="cursor: pointer;">Banani</label>
                 </div>
                 <div class="form-check mb-2">
-                    <input class="form-check-input loc-checkbox specific-loc" type="checkbox" value="115051364533" id="locDhanmondi">
+                    <input class="form-check-input loc-checkbox specific-loc" type="checkbox" value="115051364533" id="locDhanmondi" onclick="updateAllCheckbox()">
                     <label class="form-check-label" for="locDhanmondi" style="cursor: pointer;">Dhanmondi</label>
                 </div>
                 <div class="form-check mb-2">
-                    <input class="form-check-input loc-checkbox specific-loc" type="checkbox" value="115051430069" id="locUttara">
+                    <input class="form-check-input loc-checkbox specific-loc" type="checkbox" value="115051430069" id="locUttara" onclick="updateAllCheckbox()">
                     <label class="form-check-label" for="locUttara" style="cursor: pointer;">Uttara</label>
                 </div>
             </div>
@@ -601,6 +601,12 @@
             document.querySelectorAll('.specific-loc').forEach(cb => {
                 cb.checked = source.checked;
             });
+        }
+
+        function updateAllCheckbox() {
+            const allSpecifics = Array.from(document.querySelectorAll('.specific-loc'));
+            const allChecked = allSpecifics.every(cb => cb.checked);
+            document.getElementById('locAll').checked = allChecked;
         }
 
         function submitZeroInventory() {
